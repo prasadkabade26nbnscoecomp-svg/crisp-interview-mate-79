@@ -1,5 +1,5 @@
 const GEMINI_API_KEY = 'AIzaSyDU7acDWYT0BP98WrPC4ZWTkt3P4nnu3NU';
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent';
 
 export interface GeminiResponse {
   candidates: {
@@ -91,9 +91,8 @@ Return a JSON array with this exact format:
 
 Make questions specific to Full Stack development, React, Node.js, and tailor them to the candidate's experience level shown in the resume.`;
 
-    const response = await this.makeRequest(prompt);
-    
     try {
+      const response = await this.makeRequest(prompt);
       // Extract JSON from response
       const jsonMatch = response.match(/\[[\s\S]*?\]/);
       if (jsonMatch) {
@@ -102,7 +101,7 @@ Make questions specific to Full Stack development, React, Node.js, and tailor th
         throw new Error('No valid JSON found in response');
       }
     } catch (error) {
-      console.error('Error parsing questions:', error);
+      console.error('Error getting or parsing questions:', error);
       // Fallback questions
       return [
         { id: 'q1', question: 'What is React and why is it useful?', difficulty: 'easy', timeLimit: 20 },
@@ -130,15 +129,14 @@ Provide a score from 0-10 and analysis in this exact JSON format:
 
 Consider technical accuracy, depth of knowledge, and communication clarity.`;
 
-    const response = await this.makeRequest(prompt);
-    
     try {
+      const response = await this.makeRequest(prompt);
       const jsonMatch = response.match(/\{[\s\S]*?\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
     } catch (error) {
-      console.error('Error parsing evaluation:', error);
+      console.error('Error getting or parsing evaluation:', error);
     }
     
     // Fallback evaluation
@@ -168,15 +166,14 @@ Provide a JSON response with overall assessment:
   "summary": "Comprehensive summary of candidate's strengths, weaknesses, and recommendation"
 }`;
 
-    const response = await this.makeRequest(prompt);
-    
     try {
+      const response = await this.makeRequest(prompt);
       const jsonMatch = response.match(/\{[\s\S]*?\}/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[0]);
       }
     } catch (error) {
-      console.error('Error parsing summary:', error);
+      console.error('Error getting or parsing final summary:', error);
     }
 
     return {
