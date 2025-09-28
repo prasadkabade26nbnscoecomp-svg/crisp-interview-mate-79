@@ -11,6 +11,7 @@ import { store, persistor } from './store/store';
 import HomePage from "./pages/HomePage";
 import InterviewPage from "./pages/InterviewPage";
 import DashboardPage from "./pages/DashboardPage";
+import UserResultsPage from "./pages/UserResultsPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/" element={<HomePage />} />
               <Route path="/interview" element={<InterviewPage />} />
               <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/results" element={<UserResultsPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

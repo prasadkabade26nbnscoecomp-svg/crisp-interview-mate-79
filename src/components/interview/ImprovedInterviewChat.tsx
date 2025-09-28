@@ -27,7 +27,9 @@ import {
   BrainCircuit,
   CheckCircle,
   AlertTriangle,
-  MessageCircle
+  MessageCircle,
+  PlayCircle,
+  StopCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,7 +38,7 @@ interface InterviewChatProps {
   onComplete: () => void;
 }
 
-const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
+const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   const dispatch = useDispatch();
   const { toast } = useToast();
   
@@ -45,39 +47,28 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   const [currentAnswer, setCurrentAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [showAnswerInput, setShowAnswerInput] = useState(false);
   const [mediaDevices, setMediaDevices] = useState({
     camera: false,
     microphone: false
   });
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showAnswerInput, setShowAnswerInput] = useState(false);
   
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Start timer when question changes
   useEffect(() => {
-    // Initialize interview if not already started
-    if (!interview.isActive && interview.questions.length === 0) {
-      initializeInterview();
-    }
-  }, []);
-
-  useEffect(() => {
-    // Start timer when interview is active and not paused
     if (interview.isActive && !interview.isPaused && interview.timeRemaining > 0) {
       timerRef.current = setInterval(() => {
-        dispatch(setTimeRemaining(Math.max(0, interview.timeRemaining - 1)));
+        dispatch(setTimeRemaining(interview.timeRemaining - 1));
+        
+        if (interview.timeRemaining <= 1) {
+          handleTimeUp();
+        }
       }, 1000);
-    } else {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    }
-
-    // Auto-submit when time runs out
-    if (interview.timeRemaining === 0 && interview.isActive && !interview.isPaused) {
-      handleTimeUp();
     }
 
     return () => {
@@ -88,30 +79,44 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   }, [interview.timeRemaining, interview.isActive, interview.isPaused]);
 
   useEffect(() => {
+    // Initialize interview if not already started
+    if (!interview.isActive && interview.questions.length === 0) {
+      initializeInterview();
+    }
+  }, []);
+
+  useEffect(() => {
     // Scroll to bottom when new messages appear
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [interview.currentQuestionIndex]);
 
+  // Clean up media stream on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
+
   const initializeInterview = async () => {
     setIsGeneratingQuestions(true);
     
     try {
-      // Generate questions using Gemini
       const questions = await GeminiService.generateInterviewQuestions(
         interview.candidateInfo.resumeText || 'Full Stack Developer position'
       );
       
       dispatch(setQuestions(questions));
       
-      // Start the interview
       const sessionId = `interview_${Date.now()}`;
       dispatch(startInterview(sessionId));
       
       toast({
         title: "Interview Started!",
-        description: "Good luck! Answer each question within the time limit.",
+        description: "Click 'Start Answering' when ready for each question.",
       });
       
     } catch (error) {
@@ -126,38 +131,92 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
     }
   };
 
+  const startAnswering = async () => {
+    try {
+      // Request media permissions
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: true 
+      });
+      
+      setStream(mediaStream);
+      setIsRecording(true);
+      setShowAnswerInput(true);
+      
+      // Show video preview
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+      
+      setMediaDevices({
+        camera: true,
+        microphone: true
+      });
+      
+      toast({
+        title: "Recording Started",
+        description: "Camera and microphone are now active. Start typing your answer.",
+      });
+      
+    } catch (error) {
+      console.error('Media permission denied:', error);
+      toast({
+        title: "Media Permission Required",
+        description: "Please allow camera and microphone access to continue.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const stopAnswering = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    
+    setIsRecording(false);
+    setMediaDevices({ camera: false, microphone: false });
+    
+    toast({
+      title: "Recording Stopped",
+      description: "Camera and microphone have been disabled.",
+    });
+  };
+
   const handleSubmitAnswer = async () => {
     if (!currentAnswer.trim()) {
       toast({
-        title: "Please provide an answer",
-        description: "You need to answer the question before proceeding.",
+        title: "Answer Required",
+        description: "Please provide an answer before submitting.",
         variant: "destructive"
       });
       return;
     }
 
     setIsLoading(true);
+    stopAnswering(); // Stop recording when submitting
+    setShowAnswerInput(false);
     
     try {
       const currentQuestion = interview.questions[interview.currentQuestionIndex];
       
-      // Evaluate answer using Gemini
       const evaluation = await GeminiService.evaluateAnswer(
         currentQuestion.question,
         currentAnswer.trim()
       );
-      
-      // Submit answer with evaluation
+
       dispatch(submitAnswer({
         answer: currentAnswer.trim(),
         score: evaluation.score,
         aiAnalysis: evaluation.analysis
       }));
       
-      // Clear current answer
       setCurrentAnswer('');
       
-      // Move to next question or complete interview
       if (interview.currentQuestionIndex < interview.questions.length - 1) {
         dispatch(nextQuestion());
         toast({
@@ -183,13 +242,13 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   const handleTimeUp = async () => {
     const answerText = currentAnswer.trim() || 'No answer provided due to time limit.';
     
+    stopAnswering(); // Stop recording when time is up
+    setShowAnswerInput(false);
+    
     try {
-      const currentQuestion = interview.questions[interview.currentQuestionIndex];
-      
-      // Submit with time-up penalty
       dispatch(submitAnswer({
         answer: answerText,
-        score: currentAnswer.trim() ? 3 : 0, // Partial credit if something was written
+        score: currentAnswer.trim() ? 3 : 0,
         aiAnalysis: 'Time limit exceeded. ' + (currentAnswer.trim() ? 'Partial answer submitted.' : 'No answer provided.')
       }));
       
@@ -213,19 +272,16 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
 
   const completeInterviewProcess = async () => {
     try {
-      // Generate final summary
       const finalResult = await GeminiService.generateFinalSummary(
         interview.questions,
         interview.candidateInfo.name || 'Candidate'
       );
       
-      // Complete interview in Redux
       dispatch(completeInterview({
         finalScore: finalResult.score,
         aiSummary: finalResult.summary
       }));
       
-      // Add candidate to candidates list
       const candidateRecord = {
         id: `candidate_${Date.now()}`,
         name: interview.candidateInfo.name || 'Unknown',
@@ -243,7 +299,7 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
       
       toast({
         title: "Interview Complete!",
-        description: `Final score: ${finalResult.score}/10`,
+        description: `Final score: ${finalResult.score}%`,
       });
       
       setTimeout(() => {
@@ -260,43 +316,38 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
     }
   };
 
-  const currentQuestion = interview.questions[interview.currentQuestionIndex];
-  const progress = ((interview.currentQuestionIndex + 1) / interview.questions.length) * 100;
-  
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getDifficultyColor = (difficulty: string) => {
+  const getDifficultyBadgeVariant = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'text-success';
-      case 'medium': return 'text-warning';
-      case 'hard': return 'text-destructive';
-      default: return 'text-muted-foreground';
+      case 'easy': return 'default' as const;
+      case 'medium': return 'secondary' as const;
+      case 'hard': return 'destructive' as const;
+      default: return 'outline' as const;
     }
   };
 
-  const getDifficultyBadgeVariant = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'default';
-      case 'medium': return 'secondary';
-      case 'hard': return 'destructive';
-      default: return 'outline';
-    }
-  };
+  const currentQuestion = interview.questions[interview.currentQuestionIndex];
+  const progress = ((interview.currentQuestionIndex + 1) / interview.questions.length) * 100;
 
   if (isGeneratingQuestions) {
     return (
-      <div className="max-w-4xl mx-auto text-center py-12">
+      <div className="flex items-center justify-center h-96">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="space-y-6"
+          className="text-center space-y-4"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full mx-auto animate-spin" />
-          <h2 className="text-2xl font-bold text-gradient">Generating Your Interview Questions</h2>
+          <motion.div
+            className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full mx-auto"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+          />
+          <h3 className="text-xl font-semibold">Generating Interview Questions</h3>
           <p className="text-muted-foreground">
             Our AI is analyzing your resume to create personalized questions...
           </p>
@@ -306,7 +357,7 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6">
       {/* Interview Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -347,11 +398,10 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
         </Card>
       </motion.div>
 
-      {/* Chat Interface */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Chat Messages */}
-        <div className="lg:col-span-2">
-          <Card className="h-[60vh] flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Chat Interface */}
+        <div className="lg:col-span-3">
+          <Card className="h-[70vh] flex flex-col">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <MessageCircle className="w-5 h-5" />
@@ -368,7 +418,12 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
                 {interview.questions.slice(0, interview.currentQuestionIndex).map((q, index) => (
                   <div key={q.id} className="space-y-3">
                     <div className="chat-bubble-ai p-4">
-                      <p className="font-medium mb-2">Question {index + 1}:</p>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <Badge variant="outline">Question {index + 1}</Badge>
+                        <Badge variant={getDifficultyBadgeVariant(q.difficulty)}>
+                          {q.difficulty}
+                        </Badge>
+                      </div>
                       <p>{q.question}</p>
                     </div>
                     
@@ -390,98 +445,158 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
                     animate={{ opacity: 1, y: 0 }}
                     className="chat-bubble-ai p-4"
                   >
-                    <p className="font-medium mb-2">
-                      Question {interview.currentQuestionIndex + 1}:
-                    </p>
-                    <p>{currentQuestion.question}</p>
-                    <div className="mt-2 text-sm opacity-70">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <Badge variant="outline">
+                        Question {interview.currentQuestionIndex + 1}
+                      </Badge>
+                      <Badge variant={getDifficultyBadgeVariant(currentQuestion.difficulty)}>
+                        {currentQuestion.difficulty}
+                      </Badge>
+                    </div>
+                    <p className="mb-3">{currentQuestion.question}</p>
+                    <div className="text-sm opacity-70">
                       Time limit: {formatTime(currentQuestion.timeLimit)}
                     </div>
                   </motion.div>
                 )}
               </div>
 
-              {/* Answer Input */}
-              <div className="space-y-3">
-                <Textarea
-                  placeholder="Type your answer here..."
-                  value={currentAnswer}
-                  onChange={(e) => setCurrentAnswer(e.target.value)}
-                  className="min-h-24 resize-none"
-                  disabled={isLoading || interview.timeRemaining === 0}
-                />
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">
-                    {currentAnswer.length} characters
-                  </span>
-                  
-                  <Button
-                    onClick={handleSubmitAnswer}
-                    disabled={!currentAnswer.trim() || isLoading}
-                    className="btn-hero"
-                  >
-                    {isLoading ? (
-                      <motion.div
-                        className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+              {/* Answer Controls */}
+              <div className="space-y-3 border-t pt-4">
+                {!showAnswerInput ? (
+                  <div className="text-center">
+                    <Button
+                      onClick={startAnswering}
+                      className="btn-hero text-lg px-8 py-4"
+                      disabled={isLoading || !currentQuestion}
+                    >
+                      <PlayCircle className="w-5 h-5 mr-2" />
+                      Start Answering
+                    </Button>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      This will activate your camera and microphone
+                    </p>
+                  </div>
+                ) : (
+                  <AnimatePresence>
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="space-y-3"
+                    >
+                      <Textarea
+                        placeholder="Type your answer here..."
+                        value={currentAnswer}
+                        onChange={(e) => setCurrentAnswer(e.target.value)}
+                        className="min-h-32 resize-none"
+                        disabled={isLoading || interview.timeRemaining === 0}
                       />
-                    ) : (
-                      <Send className="w-4 h-4 mr-2" />
-                    )}
-                    {isLoading ? 'Submitting...' : 'Submit Answer'}
-                  </Button>
-                </div>
+                      
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center space-x-4">
+                          <span className="text-sm text-muted-foreground">
+                            {currentAnswer.length} characters
+                          </span>
+                          
+                          {isRecording && (
+                            <div className="flex items-center space-x-2 text-sm text-success">
+                              <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
+                              <span>Recording active</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex space-x-2">
+                          <Button
+                            onClick={stopAnswering}
+                            variant="outline"
+                            size="sm"
+                          >
+                            <StopCircle className="w-4 h-4 mr-2" />
+                            Stop Recording
+                          </Button>
+                          
+                          <Button
+                            onClick={handleSubmitAnswer}
+                            disabled={!currentAnswer.trim() || isLoading}
+                            className="btn-hero"
+                          >
+                            {isLoading ? (
+                              <motion.div
+                                className="w-4 h-4 border-2 border-current border-t-transparent rounded-full mr-2"
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                              />
+                            ) : (
+                              <Send className="w-4 h-4 mr-2" />
+                            )}
+                            {isLoading ? 'Submitting...' : 'Submit Answer'}
+                          </Button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Interview Status Panel */}
+        {/* Side Panel */}
         <div className="space-y-4">
-          {/* Candidate Info */}
+          {/* Video Preview */}
+          {isRecording && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Camera Preview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  muted
+                  className="w-full h-32 bg-muted rounded-lg object-cover"
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Media Status */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Candidate Info</CardTitle>
+              <CardTitle className="text-sm">Media Status</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <div>
-                <span className="text-sm text-muted-foreground">Name:</span>
-                <p className="font-medium">{interview.candidateInfo.name}</p>
-              </div>
-              <div>
-                <span className="text-sm text-muted-foreground">Email:</span>
-                <p className="font-medium">{interview.candidateInfo.email}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Media Controls */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Media Controls</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm">Camera</span>
-                <Button variant="outline" size="icon">
-                  {mediaDevices.camera ? <Camera className="w-4 h-4" /> : <CameraOff className="w-4 h-4" />}
-                </Button>
+                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${
+                  mediaDevices.camera ? 'bg-success/20 text-success' : 'bg-muted'
+                }`}>
+                  {mediaDevices.camera ? <Camera className="w-3 h-3" /> : <CameraOff className="w-3 h-3" />}
+                  <span className="text-xs">
+                    {mediaDevices.camera ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-sm">Microphone</span>
-                <Button variant="outline" size="icon">
-                  {mediaDevices.microphone ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                </Button>
+                <div className={`flex items-center space-x-1 px-2 py-1 rounded-full ${
+                  mediaDevices.microphone ? 'bg-success/20 text-success' : 'bg-muted'
+                }`}>
+                  {mediaDevices.microphone ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />}
+                  <span className="text-xs">
+                    {mediaDevices.microphone ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Question Summary */}
+          {/* Question Progress */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Question Progress</CardTitle>
+              <CardTitle className="text-sm">Progress</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -511,4 +626,4 @@ const InterviewChat = ({ interviewType, onComplete }: InterviewChatProps) => {
   );
 };
 
-export default InterviewChat;
+export default ImprovedInterviewChat;

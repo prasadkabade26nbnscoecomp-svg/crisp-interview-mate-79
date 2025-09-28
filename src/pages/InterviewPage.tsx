@@ -11,7 +11,7 @@ import { ArrowLeft, Camera, Mic, Upload, MessageCircle } from 'lucide-react';
 // Interview Components
 import ResumeUpload from '@/components/interview/ResumeUpload';
 import CandidateInfoForm from '@/components/interview/CandidateInfoForm';
-import InterviewChat from '@/components/interview/InterviewChat';
+import ImprovedInterviewChat from '@/components/interview/ImprovedInterviewChat';
 import InterviewComplete from '@/components/interview/InterviewComplete';
 
 const InterviewPage = () => {
@@ -181,7 +181,7 @@ const InterviewPage = () => {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <InterviewChat 
+              <ImprovedInterviewChat 
                 interviewType={interviewType}
                 onComplete={() => setCurrentStep('complete')}
               />

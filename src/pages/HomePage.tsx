@@ -158,9 +158,9 @@ const HomePage = () => {
                 size="lg" 
                 variant="outline" 
                 className="text-lg px-8 py-6"
-                onClick={() => navigate('/dashboard')}
+                onClick={() => navigate('/results')}
               >
-                View Results
+                View My Results
               </Button>
             </motion.div>
           </motion.div>
