@@ -17,12 +17,12 @@
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
     
-    /* Brand Primary - Professional Deep Blue */
-    --primary: 213 94% 68%;
+    /* Brand Primary - Modern Purple */
+    --primary: 259 94% 68%;
     --primary-foreground: 0 0% 98%;
-    --primary-glow: 213 94% 78%;
+    --primary-glow: 259 94% 78%;
     
-    /* Secondary - Elegant Gray */
+    /* Secondary - Rich Navy */
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     
@@ -30,18 +30,18 @@
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
     
-    /* Accent - Vibrant Cyan */
-    --accent: 188 95% 68%;
+    /* Accent - Vibrant Teal */
+    --accent: 174 95% 68%;
     --accent-foreground: 0 0% 98%;
-    --accent-glow: 188 95% 78%;
+    --accent-glow: 174 95% 78%;
     
-    /* Success - Fresh Green */
-    --success: 142 76% 36%;
+    /* Success - Emerald Green */
+    --success: 160 76% 36%;
     --success-foreground: 0 0% 98%;
-    --success-glow: 142 76% 46%;
+    --success-glow: 160 76% 46%;
     
-    /* Warning - Warm Orange */
-    --warning: 38 92% 50%;
+    /* Warning - Warm Amber */
+    --warning: 43 92% 50%;
     --warning-foreground: 0 0% 98%;
     
     /* Destructive - Vibrant Red */
@@ -56,7 +56,7 @@
     /* Gradients */
     --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--accent)));
     --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(var(--success-glow)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
+    --gradient-subtle: linear-gradient(180deg, hsl(220 13% 9%), hsl(240 10% 3.9%));
     --gradient-hero: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%);
     
     /* Shadows */
@@ -144,7 +144,7 @@
   
   /* Chat Bubble Styles */
   .chat-bubble-user {
-    @apply bg-primary text-primary-foreground rounded-2xl rounded-br-md;
+    @apply bg-gradient-to-br from-primary to-accent text-primary-foreground rounded-2xl rounded-br-md;
     @apply shadow-[var(--shadow-accent)] max-w-[80%] ml-auto;
   }
   
