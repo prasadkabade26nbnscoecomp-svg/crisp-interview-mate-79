@@ -17,20 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Clock, 
-  Send, 
-  Mic, 
-  MicOff, 
-  Camera, 
-  CameraOff,
-  BrainCircuit,
-  CheckCircle,
-  AlertTriangle,
-  MessageCircle,
-  PlayCircle,
-  StopCircle
-} from 'lucide-react';
+import { Clock, Send, Mic, MicOff, Camera, CameraOff, BrainCircuit, CircleCheck as CheckCircle, TriangleAlert as AlertTriangle, MessageCircle, CirclePlay as PlayCircle, CircleStop as StopCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface InterviewChatProps {

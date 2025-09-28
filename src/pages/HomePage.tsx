@@ -4,17 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  BrainCircuit, 
-  Clock, 
-  Users, 
-  Award, 
-  ArrowRight, 
-  Sparkles,
-  Code2,
-  Database,
-  Globe
-} from 'lucide-react';
+import { BrainCircuit, Clock, Users, Award, ArrowRight, Sparkles, Code as Code2, Database, Globe } from 'lucide-react';
 
 const HomePage = () => {
   const navigate = useNavigate();
