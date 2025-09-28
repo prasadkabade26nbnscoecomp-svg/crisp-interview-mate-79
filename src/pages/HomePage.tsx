@@ -95,12 +95,6 @@ const HomePage = () => {
           
           <div className="flex items-center space-x-4">
             <Button
-              variant="outline"
-              onClick={() => navigate('/dashboard')}
-            >
-              Dashboard
-            </Button>
-            <Button
               onClick={() => navigate('/login')}
               className="btn-hero"
             >

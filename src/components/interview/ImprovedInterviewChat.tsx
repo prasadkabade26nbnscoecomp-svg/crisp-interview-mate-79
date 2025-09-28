@@ -50,6 +50,8 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showAnswerInput, setShowAnswerInput] = useState(false);
+  const [showQuestion, setShowQuestion] = useState(false);
+  const [questionReadTime, setQuestionReadTime] = useState(0);
   const [mediaDevices, setMediaDevices] = useState({
     camera: false,
     microphone: false
@@ -61,7 +63,7 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
 
   // Start timer when question changes
   useEffect(() => {
-    if (interview.isActive && !interview.isPaused && interview.timeRemaining > 0) {
+    if (interview.isActive && !interview.isPaused && interview.timeRemaining > 0 && showAnswerInput) {
       timerRef.current = setInterval(() => {
         dispatch(setTimeRemaining(interview.timeRemaining - 1));
         
@@ -76,12 +78,15 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
         clearInterval(timerRef.current);
       }
     };
-  }, [interview.timeRemaining, interview.isActive, interview.isPaused]);
+  }, [interview.timeRemaining, interview.isActive, interview.isPaused, showAnswerInput]);
 
   useEffect(() => {
     // Initialize interview if not already started
     if (!interview.isActive && interview.questions.length === 0) {
       initializeInterview();
+    } else if (interview.isActive && interview.questions.length > 0) {
+      // Show current question with read time
+      showCurrentQuestion();
     }
   }, []);
 
@@ -101,6 +106,42 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
     };
   }, [stream]);
 
+  const showCurrentQuestion = () => {
+    setShowQuestion(true);
+    setShowAnswerInput(false);
+    
+    // Give user time to read the question based on difficulty
+    const currentQuestion = interview.questions[interview.currentQuestionIndex];
+    let readTime = 10; // Default 10 seconds
+    
+    if (currentQuestion) {
+      switch (currentQuestion.difficulty) {
+        case 'easy':
+          readTime = 8;
+          break;
+        case 'medium':
+          readTime = 15;
+          break;
+        case 'hard':
+          readTime = 20;
+          break;
+      }
+    }
+    
+    setQuestionReadTime(readTime);
+    
+    // Start countdown for reading time
+    const readTimer = setInterval(() => {
+      setQuestionReadTime(prev => {
+        if (prev <= 1) {
+          clearInterval(readTimer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
   const initializeInterview = async () => {
     setIsGeneratingQuestions(true);
     
@@ -116,8 +157,13 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
       
       toast({
         title: "Interview Started!",
-        description: "Click 'Start Answering' when ready for each question.",
+        description: "Take your time to read each question before answering.",
       });
+      
+      // Show first question after a brief delay
+      setTimeout(() => {
+        showCurrentQuestion();
+      }, 1000);
       
     } catch (error) {
       console.error('Failed to generate questions:', error);
@@ -219,6 +265,10 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
       
       if (interview.currentQuestionIndex < interview.questions.length - 1) {
         dispatch(nextQuestion());
+        // Show next question
+        setTimeout(() => {
+          showCurrentQuestion();
+        }, 1000);
         toast({
           title: "Answer submitted!",
           description: `Score: ${evaluation.score}/10. Moving to next question.`,
@@ -256,6 +306,10 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
       
       if (interview.currentQuestionIndex < interview.questions.length - 1) {
         dispatch(nextQuestion());
+        // Show next question
+        setTimeout(() => {
+          showCurrentQuestion();
+        }, 1000);
         toast({
           title: "Time's up!",
           description: "Moving to the next question.",
@@ -443,7 +497,7 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="chat-bubble-ai p-4"
+                    className={`chat-bubble-ai p-4 ${!showQuestion ? 'opacity-50' : ''}`}
                   >
                     <div className="flex items-center space-x-2 mb-2">
                       <Badge variant="outline">
@@ -456,6 +510,11 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
                     <p className="mb-3">{currentQuestion.question}</p>
                     <div className="text-sm opacity-70">
                       Time limit: {formatTime(currentQuestion.timeLimit)}
+                      {questionReadTime > 0 && (
+                        <span className="ml-4 text-primary font-medium">
+                          Read time: {questionReadTime}s
+                        </span>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -463,7 +522,28 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
 
               {/* Answer Controls */}
               <div className="space-y-3 border-t pt-4">
-                {!showAnswerInput ? (
+                {questionReadTime > 0 ? (
+                  <div className="text-center">
+                    <div className="mb-4">
+                      <div className="text-lg font-semibold text-primary mb-2">
+                        Take your time to read the question
+                      </div>
+                      <div className="text-3xl font-bold text-accent">
+                        {questionReadTime}
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        seconds remaining to review
+                      </p>
+                    </div>
+                    <Progress 
+                      value={((interview.questions[interview.currentQuestionIndex]?.difficulty === 'easy' ? 8 : 
+                               interview.questions[interview.currentQuestionIndex]?.difficulty === 'medium' ? 15 : 20) - questionReadTime) / 
+                             (interview.questions[interview.currentQuestionIndex]?.difficulty === 'easy' ? 8 : 
+                              interview.questions[interview.currentQuestionIndex]?.difficulty === 'medium' ? 15 : 20) * 100} 
+                      className="progress-glow" 
+                    />
+                  </div>
+                ) : !showAnswerInput ? (
                   <div className="text-center">
                     <Button
                       onClick={startAnswering}
@@ -471,10 +551,10 @@ const ImprovedInterviewChat = ({ interviewType, onComplete }: InterviewChatProps
                       disabled={isLoading || !currentQuestion}
                     >
                       <PlayCircle className="w-5 h-5 mr-2" />
-                      Start Answering
+                      Ready to Answer
                     </Button>
                     <p className="text-sm text-muted-foreground mt-2">
-                      This will activate your camera and microphone
+                      Click when you're ready to start answering
                     </p>
                   </div>
                 ) : (
